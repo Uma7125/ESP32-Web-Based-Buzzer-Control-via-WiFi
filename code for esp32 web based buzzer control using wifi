@@ -1,0 +1,74 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <WiFiServer.h>
+
+// Replace with your network credentials
+const char* ssid = "Realme 11";
+const char* password = "Theju123";
+const int buzzerPin = 12;
+
+WiFiServer server(80);
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nConnected!");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+  pinMode(buzzerPin, OUTPUT);
+  server.begin();
+}
+
+void loop() {
+  WiFiClient client = server.available();
+
+  if (client) {
+    Serial.println("New Client.");
+    String currentLine = "";
+    bool buzzerOn = false;
+
+    while (client.connected()) {
+      if (client.available()) {
+        char c = client.read();
+        Serial.write(c);
+        if (c == '\n') {
+          if (currentLine.length() == 0) {
+            client.println("HTTP/1.1 200 OK");
+            client.println("Content-type:text/html");
+            client.println();
+            client.println("<!DOCTYPE html><html>");
+            client.println("<head><title>ESP32 Buzzer Control</title></head>");
+            client.println("<body><h1>Control Your Buzzer</h1>");
+            client.println("<p><a href=\"/ON\"><button style=\"font-size:24px; padding: 10px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;\">Turn ON</button></a></p>");
+            client.println("<p><a href=\"/OFF\"><button style=\"font-size:24px; padding: 10px; background-color: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer;\">Turn OFF</button></a></p>");
+            client.println("</body></html>");
+            break;
+          } else {
+            if (currentLine.indexOf("GET /ON") != -1) {
+              Serial.println("Turning buzzer ON");
+              tone(buzzerPin, 1000);
+              buzzerOn = true;
+            } else if (currentLine.indexOf("GET /OFF") != -1) {
+              Serial.println("Turning buzzer OFF");
+              noTone(buzzerPin);
+              buzzerOn = false;
+            }
+          }
+          currentLine = "";
+        } else if (c != '\r') {
+          currentLine += c;
+        }
+      }
+    }
+    client.stop();
+    Serial.println("Client Disconnected.");
+  }
+  delay(10);
+}
